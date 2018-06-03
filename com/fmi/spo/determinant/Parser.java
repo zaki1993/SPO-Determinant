@@ -1,34 +1,17 @@
 package com.fmi.spo.determinant;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.io.PrintWriter;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.DoubleStream;
-import java.util.stream.Stream;
 
 public class Parser {
 	
-	private static final Set allowedCommands = new HashSet();
+	private static final Set<String> allowedCommands = new HashSet<>();
 	
 	static {
 		allowedCommands.add("-n");
@@ -42,10 +25,10 @@ public class Parser {
 		
 		try {
 			Parser d = new Parser();
-			Map commands = d.parseInput(args);
+			Map<String, String> commands = d.parseInput(args);
 			d.evaluateCommands(commands);
 		} catch (Exception e) {
-			System.out.println(e.getMessage());
+			e.printStackTrace();
 		} finally {
 			try {
 				PrintData.destroy();
@@ -53,46 +36,54 @@ public class Parser {
 		}
 	}
 
-	private Map parseInput(String[] args) throws IOException {
+	private Map<String, String> parseInput(String[] args) throws IOException {
 		
 		if (args.length < 2) {
 			throw new IllegalArgumentException("Incorrect number of parameters provided. Expected 2, but got " + args.length);
 		}
-		String command = args[0];
-		Map commands = new HashMap();
+		Map<String, String> commands = new HashMap<>();
 
 		for (int i = 0; i < args.length; i += 2) {	
-			if (i >= args.length) {
-				if (i + 1 >= args.length) {
-					throw new IllegalArgumentException("Invalid command provided..!");
-				} else {
+			if (i >= args.length - 1) {
+				if (args[i].equals("-q")) {
 					commands.put(args[i], null);
 					continue;
+				} else {
+					throw new IllegalArgumentException("Invalid command provided..!");
 				}
 			}
-			commands.put(args[i], args[i + 1]);
+			if (args[i].equals("-q")) {
+				commands.put(args[i], null);
+				if (i != args.length - 1) {
+					i--;
+				}
+			} else {
+				commands.put(args[i], args[i + 1]);
+			}
 		}
 		return commands;
 	}
 
 	private void evaluateCommands(Map<String, String> commands) throws IOException {
-		
-		double[][] matrix = new MatrixBuilder().buildMatrix(commands);
+
 		int maxThreadCount = getMaxThreadCount(commands);
 		boolean isQuietMode = getQuietMode(commands);
 		String outputFile = commands.get("-o");
 		
+		OutputStream out = System.out;
 		if (outputFile != null) {
-			PrintStream filePs = new PrintStream(new File(outputFile));
-			PrintData.init(isQuietMode, filePs, System.out);
-		} else {
-			PrintData.init(isQuietMode, System.out);
+			out = new PrintStream(new File(outputFile));
 		}
+		PrintData.init(isQuietMode, out);
+		
+		double[][] matrix = new MatrixBuilder().buildMatrix(commands);
+		printMatrix(matrix);
 		
 		long start = System.currentTimeMillis();
 		double result = calcDeterminant(matrix, maxThreadCount);
 		long end = System.currentTimeMillis();
-		printMatrix(matrix, result, end - start);
+		PrintData.println("Total execution time for current run " + (end - start) + " ms");
+		PrintData.println("Determinant: " + result);
 	}
 
 	private double calcDeterminant(double[][] matrix, int maxThreadCount) {
@@ -100,11 +91,12 @@ public class Parser {
 		double result = 0d;
 		try {
 			ThreadPool.init(maxThreadCount);
-			Test m = new Test(matrix);
+			Matrix m = new Matrix(matrix);
 			if (maxThreadCount == 1) {
 				result = m.calcDeterminant(matrix);
 			} else {
 				result = m.determinant();
+				ThreadPool.printThreadInfo();
 			}
 		} finally {
 			ThreadPool.destroy();
@@ -133,8 +125,9 @@ public class Parser {
 		return maxThreadCount;
 	}
 
-	private void printMatrix(double[][] matrix, double determinant, long executionTime) throws IOException {
+	private void printMatrix(double[][] matrix) {
 		
+		PrintData.println("Matrix is: ");
 		for (int row = 0; row < matrix.length; row++ ) {
 			for (int col = 0; col < matrix	.length; col++) {
 				PrintData.print(matrix[row][col]);
@@ -144,7 +137,5 @@ public class Parser {
 			}
 			PrintData.println();
 		}
-		PrintData.println("Determinant: " + determinant);
-		PrintData.println("Total execution time for current run(millis) " + executionTime);
 	} 
 }

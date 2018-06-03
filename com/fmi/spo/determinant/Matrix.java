@@ -1,27 +1,22 @@
 package com.fmi.spo.determinant;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.List;
-import java.util.Stack;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Matrix {
+
+	private static final int RECURSIVE_BOTTOM_LEVEL = 11;
+	private static final int LOWEST_LEVEL = 10;
+	private static final int SINGLE_THREAD_LEVEL = 9;
+	private static final int OPTIMAL_THREAD_SIZE = 8;
 	
 	private static int count;
 	private final List<Double> determinant;
 	private final double[][] matrix;
 	private AtomicInteger counter;
-	
-	private static final int LOWEST_LEVEL = 10;
 	
 	public Matrix(double[][] matrix) {
 		
@@ -31,6 +26,7 @@ public class Matrix {
 	}
 	
 	public static void setCounter() {
+		
 		count = (int) Math.ceil(Math.log(ThreadPool.getThreadPoolSize())) + 1;
 		if (count == 0) {
 			count = 1;
@@ -48,14 +44,16 @@ public class Matrix {
 		if (matrix.length == 2) {
 			return matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
 		}
-		
 		try {
-			if (matrix.length > (LOWEST_LEVEL - 1) && ThreadPool.hasFreeThread()) {
+			int levelAddOn = ThreadPool.getThreadPoolSize() > OPTIMAL_THREAD_SIZE ? (count / 2) : 0;
+			if (matrix.length > RECURSIVE_BOTTOM_LEVEL + levelAddOn ) {
+				return runInDepth();
+			} else if (matrix.length > SINGLE_THREAD_LEVEL) {
 				calcDeterminantMultythreaded();
-				lock();
 			} else {
 				return calcDeterminant(matrix);
 			}
+			lock();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -63,12 +61,23 @@ public class Matrix {
 		return determinant.stream().mapToDouble(x -> x).sum();
 	}
 	
+	private double runInDepth() {
+
+		double result = 0d;
+		for (int level = 0; level < matrix[0].length; level++) {
+			double[][] subMatrix = buildSubMatrix(matrix, level);
+			double subDet = new Matrix(subMatrix).determinant();
+			result += matrix[0][level] * Math.pow (-1, level) * subDet;
+		}
+		return result;
+	}
+
 	private void lock() throws InterruptedException {
 		while(determinant.size() != matrix.length) {
 			int diff = matrix.length - determinant.size();
 			if (matrix.length > LOWEST_LEVEL) {
-				int time = 1000 / Math.abs(diff - determinant.size());
-				System.out.println("Sleeping for: " + time);
+				int denom = Math.abs(diff - determinant.size());
+				int time = 1000 / (denom == 0 ? 1 : denom);
 				Thread.sleep(time);
 			}
 		}
@@ -79,13 +88,16 @@ public class Matrix {
 		for (int level = 0; level < matrix[0].length; level++) {
 			int lvl = level;
 			double[][] subMatrix = buildSubMatrix(matrix, level);
-			if (counter.get() > 0) {
+			if (counter.get() > 0 && ThreadPool.hasFreeThread()) {
 				counter.decrementAndGet();
 				ThreadPool.execute(() -> {
+					long start = System.currentTimeMillis();
 					Thread.yield();
 					double result = new Matrix(subMatrix).determinant();
 					determinant.add(matrix[0][lvl] * Math.pow (-1, lvl) * result);
 					counter.incrementAndGet();
+					long end = System.currentTimeMillis();
+					ThreadPool.processThreadInfo(Thread.currentThread(), end - start);
 				});
 			} else {
 				processSubDeterminant(matrix, lvl);

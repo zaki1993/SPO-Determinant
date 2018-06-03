@@ -2,41 +2,54 @@ package com.fmi.spo.determinant;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.List;
 
 public class PrintData {
 	
-	private static List<OutputStream> buffers = new ArrayList<>();
-	private static boolean quite;
+	private static OutputStream out;
 	
-	public static void print(Object msg) throws IOException {
-		for (OutputStream out : buffers) {
-			out.write(msg.toString().getBytes());
-			out.flush();
+	private static boolean quiet;
+	
+	public static void print(Object msg) {
+		
+		try {
+			if (out != null) {
+				out.write(msg.toString().getBytes());
+				out.flush();
+			}
+		} catch (IOException e) {
+			System.out.println(e.getMessage()); // log on STDOUT only
 		}
 	}
 	
-	public static void println() throws IOException {
+	public static void println() {
 		print("\n");
 	}
 	
-	public static void println(Object msg) throws IOException {
-		for (OutputStream out : buffers) {
-			out.write((msg.toString() + "\n").getBytes());
-			out.flush();
+	public static void println(Object msg) {
+		
+		try {
+			if (out != null) {
+				out.write((msg.toString() + "\n").getBytes());
+				out.flush();
+			}
+		} catch (IOException e) {
+			System.out.println(e.getMessage()); // log on the STDOUT only
 		}
 	}
 	
-	public static void init(boolean quite, OutputStream ...buff) {
-		PrintData.quite = quite;
-		for (OutputStream out : buff) {
-			buffers.add(out);
+	public static void init(boolean quiet, OutputStream output) {
+		PrintData.quiet = quiet;
+		PrintData.out = output;
+	}
+	
+	public static void printQuiet(Object msg) {
+		if (!quiet) {
+			println(msg);
 		}
 	}
 	
 	public static void destroy() throws IOException {
-		for (OutputStream out : buffers) {
+		if (out != null) {
 			out.close();
 		}
 	}

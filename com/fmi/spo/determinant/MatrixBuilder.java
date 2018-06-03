@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 
 public class MatrixBuilder {
 	
@@ -31,7 +30,7 @@ public class MatrixBuilder {
 			}
 		}
 		long end = System.currentTimeMillis();
-		System.out.println("Building the matrix took: " + (end - start) + " ms");
+		PrintData.println("Building the matrix took " + (end - start) + " ms");
 		return matrix;
 	}
 	
