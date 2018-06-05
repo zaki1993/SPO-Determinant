@@ -2,11 +2,36 @@ package com.fmi.spo.determinant;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.text.DecimalFormat;
 import java.util.Map;
+import java.util.Properties;
 
 public class MatrixBuilder {
+	
+	private double upperBound;
+	private double lowerBound;
+	private DecimalFormat df;
+	
+	public MatrixBuilder() {
+		loadProperties();
+	}
+	
+	private void loadProperties() {
+		
+		Properties prop = new Properties();
+		try (InputStream in = new FileInputStream("matrix.properties")) {
+			prop.load(in);
+		} catch (IOException e) {
+			e.printStackTrace(System.out);
+		}
+		df = new DecimalFormat(prop.getProperty("decimal.format", "#.00"));
+		upperBound = Double.parseDouble(prop.getProperty("upper.bound", "10"));
+		lowerBound = Double.parseDouble(prop.getProperty("lower.bound", "-10"));
+	}
 	
 	public double[][] buildMatrix(Map<String, String> commands) throws IOException {
 		
@@ -33,7 +58,7 @@ public class MatrixBuilder {
 		PrintData.println("Building the matrix took " + (end - start) + " ms");
 		return matrix;
 	}
-	
+
 	private double[][] readMatrixFile(String matrixFile) throws IOException {
 		
 		double[][] matrix;
@@ -71,7 +96,7 @@ public class MatrixBuilder {
 		double[][] matrix = new double[matrixSize][matrixSize];
 		for (int row = 0; row < matrixSize; row++) {
 			for (int col = 0; col < matrixSize; col++) {
-				matrix[row][col] = Math.random();
+				matrix[row][col] = Double.parseDouble(df.format(Math.random() * (upperBound - lowerBound) + lowerBound));
 			}
 			//matrix[row] = ThreadLocalRandom.current().doubles().limit(matrixSize).toArray();
 		}

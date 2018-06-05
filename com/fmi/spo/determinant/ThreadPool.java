@@ -13,20 +13,25 @@ public class ThreadPool {
 	private static ExecutorService threadPool;
 	private static Map<String, Long> threadsInfo;
 	
-	public static void init(int threadPoolSize) {
-		ThreadPool.threadPoolSize = threadPoolSize;
-		threadPool = Executors.newFixedThreadPool(threadPoolSize);
-		threadsInfo = new HashMap<>();
-		Matrix.setCounter();
+	public static void init(int numberOfThreads) {
+		
+		if (numberOfThreads > 1) {
+			ThreadPool.threadPoolSize = numberOfThreads;
+			threadPool = Executors.newFixedThreadPool(numberOfThreads);
+			threadsInfo = new HashMap<>();
+			Matrix.setCounter();
+		}
 	}
 	
 	public static void destroy() {
 		
-		threadPool.shutdown();
-		try {
-			threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
-		} catch (InterruptedException e) {
-			throw new RuntimeException("Calculation of determinant was too long. ");
+		if (threadPool != null) {
+			threadPool.shutdown();
+			try {
+				threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+			} catch (InterruptedException e) {
+				throw new ThreadPoolException("Calculation of determinant was too long. ");
+			}
 		}
 	}
 	

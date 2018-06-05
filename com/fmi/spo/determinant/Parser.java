@@ -21,14 +21,13 @@ public class Parser {
 		allowedCommands.add("-t");
 	}
 	
-	public static void main(String[] args) {
+	public void parse(String[] args) {
 		
 		try {
-			Parser d = new Parser();
-			Map<String, String> commands = d.parseInput(args);
-			d.evaluateCommands(commands);
+			Map<String, String> commands = parseInput(args);
+			evaluateCommands(commands);
 		} catch (Exception e) {
-			e.printStackTrace();
+			e.printStackTrace(System.out);
 		} finally {
 			try {
 				PrintData.destroy();
@@ -84,6 +83,9 @@ public class Parser {
 		long end = System.currentTimeMillis();
 		PrintData.println("Total execution time for current run " + (end - start) + " ms");
 		PrintData.println("Determinant: " + result);
+		if (outputFile != null) {
+			System.out.println("Please check " + outputFile + " for more information..!");
+		}
 	}
 
 	private double calcDeterminant(double[][] matrix, int maxThreadCount) {

@@ -3,6 +3,7 @@ package com.fmi.spo.determinant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -35,30 +36,33 @@ public class Matrix {
 	
 	public double determinant() {
 		
+		double result = 0d;
 		if (matrix.length == 0) {
-			return 0d;
+			result = 0d;
 		}
 		if (matrix.length == 1) {
-			return matrix[0][0];
+			result = matrix[0][0];
 		}
 		if (matrix.length == 2) {
-			return matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
-		}
-		try {
-			int levelAddOn = ThreadPool.getThreadPoolSize() > OPTIMAL_THREAD_SIZE ? (count / 2) : 0;
-			if (matrix.length > RECURSIVE_BOTTOM_LEVEL + levelAddOn ) {
-				return runInDepth();
-			} else if (matrix.length > SINGLE_THREAD_LEVEL) {
-				calcDeterminantMultythreaded();
-			} else {
-				return calcDeterminant(matrix);
+			result = matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
+		} else {
+			try {
+				int levelAddOn = ThreadPool.getThreadPoolSize() > OPTIMAL_THREAD_SIZE ? (count / 2) : 0;
+				if (matrix.length > RECURSIVE_BOTTOM_LEVEL + levelAddOn ) {
+					result = runInDepth();
+				} else if (matrix.length > SINGLE_THREAD_LEVEL) {
+					calcDeterminantMultithreaded();
+					lock();
+					result = determinant.stream().mapToDouble(x -> x).sum();
+				} else {
+					result = calcDeterminant(matrix);
+				}
+			} catch (Exception e) {
+				throw new DeterminantCalculationException(e);
 			}
-			lock();
-		} catch (Exception e) {
-			throw new RuntimeException(e);
 		}
 
-		return determinant.stream().mapToDouble(x -> x).sum();
+		return result;
 	}
 	
 	private double runInDepth() {
@@ -83,8 +87,8 @@ public class Matrix {
 		}
 	}
 
-	private void calcDeterminantMultythreaded() throws InterruptedException, ExecutionException {
-		
+	private void calcDeterminantMultithreaded() throws InterruptedException, ExecutionException {
+
 		for (int level = 0; level < matrix[0].length; level++) {
 			int lvl = level;
 			double[][] subMatrix = buildSubMatrix(matrix, level);
@@ -114,20 +118,20 @@ public class Matrix {
 	
 	public double calcDeterminant(double[][] matrix) {
 		
+		double result = 0d;
 		if (matrix.length == 0) {
-			return 0d;
+			result = 0d;
 		}
 		if (matrix.length == 1) {
-			return matrix[0][0];
+			result = matrix[0][0];
 		}
 		if (matrix.length == 2) {
-			return matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
-		}
-		
-		double result = 0d;
-		for (int level = 0; level < matrix[0].length; level++) {
-			double[][] temp = buildSubMatrix(matrix, level);
-			result += matrix[0][level] * Math.pow (-1, level) * calcDeterminant (temp);
+			result = matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
+		} else {
+			for (int level = 0; level < matrix[0].length; level++) {
+				double[][] temp = buildSubMatrix(matrix, level);
+				result += matrix[0][level] * Math.pow (-1, level) * calcDeterminant (temp);
+			}
 		}
 		return result;
 	}
