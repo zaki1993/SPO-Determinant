@@ -36,11 +36,14 @@ public class ThreadPool {
 	}
 	
 	public static void execute(Runnable task) {
-		threadPool.execute(task);
+		
+		if (threadPool != null) {
+			threadPool.execute(task);
+		}
 	}
 	
 	public static synchronized boolean hasFreeThread() {
-		return ((ThreadPoolExecutor) threadPool).getActiveCount() < threadPoolSize;
+		return threadPool == null ? false : ((ThreadPoolExecutor) threadPool).getActiveCount() < threadPoolSize;
 	}
 	
 	public static int getThreadPoolSize() {
@@ -48,7 +51,7 @@ public class ThreadPool {
 	}
 	
 	public static void processThreadInfo(final Thread thread, long processTime) {
-		
+			
 		String threadName = Thread.currentThread().getName();
 		threadName = threadName.substring(threadName.indexOf("thread"));
 		PrintData.printQuiet(threadName + " has worked " + processTime + " ms on a task!");		
