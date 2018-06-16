@@ -4,20 +4,29 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public class ThreadPool {
 	
+	public enum Type {
+		THREAD_POOL_EXECUTOR,
+		FORK_JOIN;
+	}
+	
 	private static int threadPoolSize;
 	private static ExecutorService threadPool;
 	private static Map<String, Long> threadsInfo;
+	private static Type type;
 	
-	public static void init(int numberOfThreads) {
+	public static void init(int numberOfThreads, Type type) {
 		
 		if (numberOfThreads > 1) {
 			ThreadPool.threadPoolSize = numberOfThreads;
-			threadPool = Executors.newFixedThreadPool(numberOfThreads);
+			ThreadPool.type = type;
+			threadPool = type == Type.THREAD_POOL_EXECUTOR ? Executors.newFixedThreadPool(numberOfThreads) :
+															 Executors.newWorkStealingPool(numberOfThreads);
 			threadsInfo = new HashMap<>();
 			Matrix.setCounter();
 		}
@@ -43,7 +52,16 @@ public class ThreadPool {
 	}
 	
 	public static synchronized boolean hasFreeThread() {
-		return threadPool == null ? false : ((ThreadPoolExecutor) threadPool).getActiveCount() < threadPoolSize;
+		
+		boolean result = threadPool != null && type != null;
+		if (result) {
+			if (type == Type.THREAD_POOL_EXECUTOR) {
+				result = ((ThreadPoolExecutor) threadPool).getActiveCount() < threadPoolSize;
+			} else {
+				result = ((ForkJoinPool) threadPool).getActiveThreadCount() < threadPoolSize;
+			}
+		}
+		return result;
 	}
 	
 	public static int getThreadPoolSize() {
@@ -53,7 +71,9 @@ public class ThreadPool {
 	public static void processThreadInfo(final Thread thread, long processTime) {
 			
 		String threadName = Thread.currentThread().getName();
-		threadName = threadName.substring(threadName.indexOf("thread"));
+		threadName = !threadName.equals("main") ? type == Type.THREAD_POOL_EXECUTOR ? 
+												  threadName.substring(threadName.indexOf("thread")) :
+												  "thread" + threadName.substring(threadName.lastIndexOf("-")) : threadName;
 		PrintData.printQuiet(threadName + " has worked " + processTime + " ms on a task!");		
 		Long currentTime = threadsInfo.get(threadName);
 		if (currentTime == null) {
@@ -70,6 +90,6 @@ public class ThreadPool {
 			PrintData.printQuiet(threadInfo.getKey() + " has worked for total " + threadInfo.getValue() + " ms!");
 			processSum += threadInfo.getValue();
 		}
-		PrintData.printQuiet("Avarage work of thread is " + (processSum/threadPoolSize) + " ms!");
+		PrintData.printQuiet("Avarage work of thread is " + (processSum / threadPoolSize) + " ms!");
 	}
 }

@@ -9,6 +9,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import com.fmi.spo.determinant.ThreadPool.Type;
+
 public class Parser {
 	
 	private static final Set<String> allowedCommands = new HashSet<>();
@@ -19,6 +21,7 @@ public class Parser {
 		allowedCommands.add("-o");
 		allowedCommands.add("-q");
 		allowedCommands.add("-t");
+		allowedCommands.add("-p");
 	}
 	
 	public void parse(String[] args) {
@@ -78,8 +81,10 @@ public class Parser {
 		double[][] matrix = new MatrixBuilder().buildMatrix(commands);
 		printMatrix(matrix);
 		
+		ThreadPool.Type type = findParallelismType(commands);
+		
 		long start = System.currentTimeMillis();
-		double result = calcDeterminant(matrix, maxThreadCount);
+		double result = calcDeterminant(matrix, maxThreadCount, type);
 		long end = System.currentTimeMillis();
 		PrintData.println("Total execution time for current run " + (end - start) + " ms");
 		PrintData.println("Determinant: " + result);
@@ -88,11 +93,27 @@ public class Parser {
 		}
 	}
 
-	private double calcDeterminant(double[][] matrix, int maxThreadCount) {
+	private Type findParallelismType(Map<String, String> commands) {
+		
+		ThreadPool.Type type = Type.THREAD_POOL_EXECUTOR;
+		
+		String typeValue = commands.get("-p");
+		if (typeValue != null) {
+			try {
+				type = ThreadPool.Type.valueOf(typeValue);
+			} catch (IllegalArgumentException e) {
+				throw new RuntimeException("Invalid parallelism type " + typeValue);
+			}
+		}
+		
+		return type;
+	}
+
+	private double calcDeterminant(double[][] matrix, int maxThreadCount, ThreadPool.Type type) {
 		
 		double result = 0d;
 		try {
-			ThreadPool.init(maxThreadCount);
+			ThreadPool.init(maxThreadCount, type);
 			Matrix m = new Matrix(matrix);
 			if (maxThreadCount == 1) {
 				result = m.calcDeterminant(matrix);
@@ -132,7 +153,7 @@ public class Parser {
 		PrintData.println("Matrix is: ");
 		for (int row = 0; row < matrix.length; row++ ) {
 			for (int col = 0; col < matrix	.length; col++) {
-				PrintData.print(matrix[row][col]);
+				PrintData.print(String.format("%-6s", matrix[row][col]));
 				if (col < matrix.length - 1) {
 					PrintData.print(" ");
 				}

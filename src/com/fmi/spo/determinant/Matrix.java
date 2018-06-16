@@ -78,10 +78,9 @@ public class Matrix {
 
 	private void lock() throws InterruptedException {
 		while(determinant.size() != matrix.length) {
-			int diff = matrix.length - determinant.size();
 			if (matrix.length > LOWEST_LEVEL) {
-				int denom = Math.abs(diff - determinant.size());
-				int time = 1000 / (denom == 0 ? 1 : denom);
+				int time = 100;
+				ThreadPool.processThreadInfo(Thread.currentThread(), time);
 				Thread.sleep(time);
 			}
 		}
@@ -96,7 +95,6 @@ public class Matrix {
 				counter.decrementAndGet();
 				ThreadPool.execute(() -> {
 					long start = System.currentTimeMillis();
-					Thread.yield();
 					double result = new Matrix(subMatrix).determinant();
 					determinant.add(matrix[0][lvl] * Math.pow (-1, lvl) * result);
 					counter.incrementAndGet();
