@@ -2,31 +2,38 @@ package com.fmi.spo.determinant;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ThreadPool {
 	
 	public enum Type {
 		THREAD_POOL_EXECUTOR,
-		FORK_JOIN;
+		FORK_JOIN,
+		NEW_THREAD;
 	}
 	
 	private static int threadPoolSize;
 	private static ExecutorService threadPool;
 	private static Map<String, Long> threadsInfo;
 	private static Type type;
+	private static AtomicInteger threadsSpawned;
 	
 	public static void init(int numberOfThreads, Type type) {
 		
 		if (numberOfThreads > 1) {
 			ThreadPool.threadPoolSize = numberOfThreads;
 			ThreadPool.type = type;
-			threadPool = type == Type.THREAD_POOL_EXECUTOR ? Executors.newFixedThreadPool(numberOfThreads) :
-															 Executors.newWorkStealingPool(numberOfThreads);
+			threadPool = (type == Type.THREAD_POOL_EXECUTOR ? Executors.newFixedThreadPool(numberOfThreads) :
+						  type == Type.FORK_JOIN ? Executors.newWorkStealingPool(numberOfThreads) : null);
+			if (threadPool == null) {
+				threadsSpawned = new AtomicInteger(0);
+			}
 			threadsInfo = new HashMap<>();
 			Matrix.setCounter();
 		}
@@ -48,6 +55,12 @@ public class ThreadPool {
 		
 		if (threadPool != null) {
 			threadPool.execute(task);
+		} else {
+			threadsSpawned.incrementAndGet();
+			new Thread(() -> {
+				task.run();
+				threadsSpawned.decrementAndGet();
+			}).start();
 		}
 	}
 	
@@ -60,6 +73,8 @@ public class ThreadPool {
 			} else {
 				result = ((ForkJoinPool) threadPool).getActiveThreadCount() < threadPoolSize;
 			}
+		} else {
+			result = threadsSpawned.get() < threadPoolSize;
 		}
 		return result;
 	}
@@ -70,10 +85,14 @@ public class ThreadPool {
 	
 	public static void processThreadInfo(final Thread thread, long processTime) {
 			
-		String threadName = Thread.currentThread().getName();
+		String threadName = thread.getName();
 		threadName = !threadName.equals("main") ? type == Type.THREAD_POOL_EXECUTOR ? 
-												  threadName.substring(threadName.indexOf("thread")) :
-												  "thread" + threadName.substring(threadName.lastIndexOf("-")) : threadName;
+					  threadName.substring(threadName.indexOf("thread")) :
+					  "thread" + threadName.substring(threadName.lastIndexOf("-")) : threadName;
+					  
+		if (thread.getName().equalsIgnoreCase(threadName)) {
+			threadName = "thread-" + new Random().nextInt(threadPoolSize);
+		}
 		PrintData.printQuiet(threadName + " has worked " + processTime + " ms on a task!");		
 		Long currentTime = threadsInfo.get(threadName);
 		if (currentTime == null) {
