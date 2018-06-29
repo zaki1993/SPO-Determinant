@@ -118,7 +118,8 @@ public class Parser {
 			if (maxThreadCount == 1) {
 				result = m.calcDeterminant(matrix);
 			} else {
-				result = m.determinant();
+				m.setTopLevel(matrix.length);
+				result = m.calcDeterminant();
 				ThreadPool.printThreadInfo();
 			}
 		} finally {

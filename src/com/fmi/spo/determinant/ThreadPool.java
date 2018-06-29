@@ -35,7 +35,6 @@ public class ThreadPool {
 				threadsSpawned = new AtomicInteger(0);
 			}
 			threadsInfo = new HashMap<>();
-			Matrix.setCounter();
 		}
 	}
 	
@@ -62,6 +61,10 @@ public class ThreadPool {
 				threadsSpawned.decrementAndGet();
 			}).start();
 		}
+	}
+	
+	public static synchronized ExecutorService get() {
+		return threadPool;
 	}
 	
 	public static synchronized boolean hasFreeThread() {
