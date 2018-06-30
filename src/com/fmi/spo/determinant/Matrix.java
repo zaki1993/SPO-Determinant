@@ -3,10 +3,12 @@ package com.fmi.spo.determinant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Matrix {
 
 	private static int topLevel;
+	private static AtomicInteger counter = new AtomicInteger(0);
 	
 	private final List<Double> determinant;
 	private final double[][] matrix;
@@ -24,9 +26,7 @@ public class Matrix {
 	public double calcDeterminant() {
 		
 		determinant();
-		while (determinant.size() != matrix.length) {
-			
-		}
+		while (determinant.size() != matrix.length) {}
 		return determinant.stream().mapToDouble(x -> x).sum();
 	}
 	
@@ -34,34 +34,29 @@ public class Matrix {
 		
 		if (matrix.length == 0) {
 			determinant.add(0d);
-		}
-		if (matrix.length == 1) {
+		} else if (matrix.length == 1) {
 			determinant.add(matrix[0][0]);
-		}
-		if (matrix.length == 2) {
+		} if (matrix.length == 2) {
 			determinant.add(matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]);
 		} else {
 			for (int level = 0; level < matrix[0].length; level++) {
 				int lvl = level;
 				double[][] subMatrix = buildSubMatrix(matrix, lvl);
-				if(ThreadPool.getThreadPoolSize() >= topLevel && topLevel == matrix.length) {
-					ThreadPool.get().execute(() -> {
+				boolean isTopLevel = topLevel == matrix.length;
+				boolean isLoweLevel = counter.get() == topLevel && matrix.length > topLevel - 2 && ThreadPool.hasFreeThread();
+				if(isTopLevel || isLoweLevel) {
+					ThreadPool.execute(() -> {
+						if (isTopLevel) {
+							counter.incrementAndGet();
+						}
 						long start = System.currentTimeMillis();
 						double result = new Matrix(subMatrix).calcDeterminant();
-						determinant.add(matrix[0][lvl] * Math.pow (-1, lvl) * result);
 						long end = System.currentTimeMillis();
 						ThreadPool.processThreadInfo(Thread.currentThread(), end - start);
+						determinant.add(matrix[0][lvl] * Math.pow (-1, lvl) * result);
 					});
-				} else if (ThreadPool.hasFreeThread()) {
-						ThreadPool.get().execute(() -> {
-							long start = System.currentTimeMillis();
-							double result = calcDeterminant(subMatrix);
-							determinant.add(matrix[0][lvl] * Math.pow (-1, lvl) * result);
-							long end = System.currentTimeMillis();
-							ThreadPool.processThreadInfo(Thread.currentThread(), end - start);
-						});
 				} else {
-					double result = calcDeterminant(subMatrix);
+					double result = subMatrix.length > 11 ? new Matrix(subMatrix).calcDeterminant() : calcDeterminant(subMatrix);
 					determinant.add(matrix[0][lvl] * Math.pow (-1, lvl) * result);	
 				}
 			}
