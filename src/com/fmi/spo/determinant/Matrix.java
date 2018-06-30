@@ -12,6 +12,8 @@ public class Matrix {
 	
 	private final List<Double> determinant;
 	private final double[][] matrix;
+	private final AtomicInteger parentCounter = new AtomicInteger(0);
+	private final AtomicInteger childCounter = new AtomicInteger(0);
 	
 	public Matrix(double[][] matrix) {
 		
@@ -26,7 +28,7 @@ public class Matrix {
 	public double calcDeterminant() {
 		
 		determinant();
-		while (determinant.size() != matrix.length) {}
+		while (determinant.size() != matrix.length && matrix.length > 2) {}
 		return determinant.stream().mapToDouble(x -> x).sum();
 	}
 	
@@ -43,17 +45,26 @@ public class Matrix {
 				int lvl = level;
 				double[][] subMatrix = buildSubMatrix(matrix, lvl);
 				boolean isTopLevel = topLevel == matrix.length;
-				boolean isLoweLevel = counter.get() == topLevel && matrix.length > topLevel - 2 && ThreadPool.hasFreeThread();
-				if(isTopLevel || isLoweLevel) {
+				boolean isLowerLevel = counter.get() == topLevel && matrix.length > topLevel - 2 && ThreadPool.hasFreeThread();
+				if ((isTopLevel && parentCounter.get() <= ThreadPool.getThreadPoolSize() / 2) ||
+					(isLowerLevel && childCounter.get() <= ThreadPool.getThreadPoolSize() / 2)) {
 					ThreadPool.execute(() -> {
 						if (isTopLevel) {
 							counter.incrementAndGet();
+							parentCounter.incrementAndGet();
+						} else {
+							childCounter.incrementAndGet();
 						}
 						long start = System.currentTimeMillis();
 						double result = new Matrix(subMatrix).calcDeterminant();
 						long end = System.currentTimeMillis();
 						ThreadPool.processThreadInfo(Thread.currentThread(), end - start);
 						determinant.add(matrix[0][lvl] * Math.pow (-1, lvl) * result);
+						if (isTopLevel) {
+							parentCounter.decrementAndGet();
+						} else {
+							childCounter.decrementAndGet();
+						}
 					});
 				} else {
 					double result = subMatrix.length > 11 ? new Matrix(subMatrix).calcDeterminant() : calcDeterminant(subMatrix);
