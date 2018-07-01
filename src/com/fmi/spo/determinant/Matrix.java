@@ -12,13 +12,22 @@ public class Matrix {
 	
 	private final List<Double> determinant;
 	private final double[][] matrix;
-	private final AtomicInteger parentCounter = new AtomicInteger(0);
-	private final AtomicInteger childCounter = new AtomicInteger(0);
+	private static final AtomicInteger parentCounter = new AtomicInteger(0);
+	private static final AtomicInteger childCounter = new AtomicInteger(0);
+	private Object lock;
+	private boolean isLocked;
+	private static int parentLimit = (int) (Math.ceil(ThreadPool.getThreadPoolSize() / 2));
+	private static int childLimit = ThreadPool.getThreadPoolSize() / 2;
 	
 	public Matrix(double[][] matrix) {
 		
 		this.matrix = matrix;
 		this.determinant = Collections.synchronizedList(new ArrayList<>());
+		lock = new Object();
+
+		if (counter.get() == topLevel) {
+			childLimit = ThreadPool.getThreadPoolSize();
+		}
 	}
 	
 	public void setTopLevel(int level) {
@@ -28,7 +37,15 @@ public class Matrix {
 	public double calcDeterminant() {
 		
 		determinant();
-		while (determinant.size() != matrix.length && matrix.length > 2) {}
+		while (determinant.size() != matrix.length && matrix.length > 2 && !isLocked) {
+			synchronized(lock) {
+				isLocked = true;
+				try {
+					lock.wait();
+				} catch (InterruptedException e) { e.printStackTrace(); }
+				isLocked = false;
+			}
+		}
 		return determinant.stream().mapToDouble(x -> x).sum();
 	}
 	
@@ -46,8 +63,8 @@ public class Matrix {
 				double[][] subMatrix = buildSubMatrix(matrix, lvl);
 				boolean isTopLevel = topLevel == matrix.length;
 				boolean isLowerLevel = counter.get() == topLevel && matrix.length > topLevel - 2 && ThreadPool.hasFreeThread();
-				if ((isTopLevel && parentCounter.get() <= ThreadPool.getThreadPoolSize() / 2) ||
-					(isLowerLevel && childCounter.get() <= ThreadPool.getThreadPoolSize() / 2)) {
+				if ((isTopLevel && parentCounter.get() <= parentLimit) ||
+					(isLowerLevel && childCounter.get() <= childLimit)) {
 					ThreadPool.execute(() -> {
 						if (isTopLevel) {
 							counter.incrementAndGet();
@@ -64,6 +81,11 @@ public class Matrix {
 							parentCounter.decrementAndGet();
 						} else {
 							childCounter.decrementAndGet();
+						}
+						if (isLocked) {
+							synchronized(lock) {
+								lock.notifyAll();
+							}
 						}
 					});
 				} else {

@@ -41,7 +41,7 @@ public class Parser {
 	private Map<String, String> parseInput(String[] args) throws IOException {
 		
 		if (args.length < 2) {
-			throw new IllegalArgumentException("Incorrect number of parameters provided. Expected 2, but got " + args.length);
+			throw new IllegalArgumentException("Incorrect number of parameters provided. Expected at least 2, but got " + args.length);
 		}
 		Map<String, String> commands = new HashMap<>();
 
